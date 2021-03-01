@@ -6,6 +6,10 @@ Created on Sun Feb 28 16:46:49 2021
 @author: seomara
 """
 
+import pandas as pd
+import numpy as np
+from sklearn.feature_selection import VarianceThreshold
+
 def delete_constants_variables(df,thrh,y):
     df2=df.drop([y],axis=1)
     constant_filter = VarianceThreshold(threshold=thrh)

@@ -6,6 +6,11 @@ Created on Sun Feb 28 16:49:13 2021
 @author: seomara
 """
 
+import random
+import pandas as pd 
+import numpy as np
+import math 
+
 def df_train_test(df,Y_name,downsampling=0.5,p_test=0.2):
     # test 
     nrow=df.shape[0]

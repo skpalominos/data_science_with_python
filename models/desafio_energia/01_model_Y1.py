@@ -55,7 +55,6 @@ p = param()
 df_pred_M1 = leer_csv(p.path,"df_model1.csv")
 df_pred_M1 = df_pred_M1.drop(['y12', 'camada_y12','date_y12', 'fecha','anno','flag'], axis=1)
 
-
 # Def parametros modelamiento ---------------------------------------------
 
 class param_fit(): 
@@ -74,11 +73,49 @@ df_train,df_test = df_train_test(df_pred_M1,'y1',param.downsampling,param.p_test
 df_train['target'].mean()
 df_test['target'].mean()
 
+# -------------------------------------------------------------------------
 # Modelo regularizado -----------------------------------------------------
+# -------------------------------------------------------------------------
 
 df_train = df_train.drop(['y1', 'camada_y1','nemotecnico_se','date_y1','date_x'], axis=1)
 df_train=df_train.replace([np.inf, -np.inf], np.nan).dropna(axis=1)
 df_train=delete_constants_variables(df_train,5,'target')
-cont_names=df_train.drop(['target'], axis=1).columns.tolist()
+predictors=df_train.drop(['target'], axis=1).columns.tolist()
+
+# importar h2o 
+import h2o
+from h2o.estimators.glm import H2OGeneralizedLinearEstimator
+
+# Regression Lasso
+train = h2o.H2OFrame(df_train)
+train['target'] = train['target'].asfactor()
+glm_reg = H2OGeneralizedLinearEstimator(alpha=1,lambda_search=True,family = 'binomial', model_id = 'reg_lasso')
+glm_reg.train(x = predictors, y = 'target', training_frame = train)
+
+# Filtrar variables que entran en el modelo 
+variables = glm_reg.varimp(use_pandas=True)
+variables['imp_cum'] = variables['percentage'].cumsum()
+variables=variables.query('imp_cum<=@param.importancia')
+variables=variables['variable'].tolist()
+
+# -------------------------------------------------------------------------
+# Modelo real  ------------------------------------------------------------
+# -------------------------------------------------------------------------
+
+# Modelo Real
+glm = H2OGeneralizedLinearEstimator(family = 'binomial', model_id = 'reg_log')
+glm.train(x = variables, y = 'target', training_frame = train)
+
+# -------------------------------------------------------------------------
+# Metricas performance ----------------------------------------------------
+# -------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
