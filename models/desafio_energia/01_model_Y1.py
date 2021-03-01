@@ -86,11 +86,36 @@ predictors=df_train.drop(['target'], axis=1).columns.tolist()
 import h2o
 from h2o.estimators.glm import H2OGeneralizedLinearEstimator
 
-# Regression Lasso
+# Bases tran y test 
+h2o.init(ip = "localhost",nthreads = -1,max_mem_size = "6g")
 train = h2o.H2OFrame(df_train)
 train['target'] = train['target'].asfactor()
-glm_reg = H2OGeneralizedLinearEstimator(alpha=1,lambda_search=True,family = 'binomial', model_id = 'reg_lasso')
-glm_reg.train(x = predictors, y = 'target', training_frame = train)
+
+df_test = df_test.drop(['y1', 'camada_y1','nemotecnico_se','date_y1','date_x'], axis=1)
+df_test=df_test.replace([np.inf, -np.inf], np.nan).dropna(axis=1)
+test = h2o.H2OFrame(df_test)
+test['target'] = test['target'].asfactor()
+
+# Regression Lasso
+
+glm_reg = H2OGeneralizedLinearEstimator(
+                     family = "binomial",
+                     link   = "logit",
+                     ignore_const_cols = True,
+                     missing_values_handling = "Skip",
+                     lambda_search = True,
+                     solver = "AUTO",
+                     alpha  = 1,
+                     seed   = 123,
+                     nfolds = 5,
+                     fold_assignment = "Stratified",
+                     keep_cross_validation_predictions = False,
+                     model_id = "glm_reg")
+
+glm_reg.train(y = 'target',
+              x = predictors,
+              training_frame = train)
+
 
 # Filtrar variables que entran en el modelo 
 variables = glm_reg.varimp(use_pandas=True)
@@ -103,12 +128,42 @@ variables=variables['variable'].tolist()
 # -------------------------------------------------------------------------
 
 # Modelo Real
-glm = H2OGeneralizedLinearEstimator(family = 'binomial', model_id = 'reg_log')
-glm.train(x = variables, y = 'target', training_frame = train)
+
+model_glm = H2OGeneralizedLinearEstimator(family = 'binomial',link   = "logit", model_id = 'reg_log')
+model_glm.train(x = variables, y = 'target', training_frame = train, validation_frame=test)
+
+#importancia predictores
+
+importancia_predictores = model_glm.varimp(use_pandas=True)
+importancia_predictores.head(10)
+
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6, 3.8))
+importancia_predictores.head(10).plot.barh(x='variable', y='scaled_importance', ax=ax)
+ax.invert_yaxis()
+fig.suptitle('Importancia de los predictores (Top 10)', fontsize='large');
 
 # -------------------------------------------------------------------------
 # Metricas performance ----------------------------------------------------
 # -------------------------------------------------------------------------
+
+performance_test = model_glm.model_performance(test_data = test)
+
+print(f"auc: {performance_test.auc()}")
+print(f"MSE: {performance_test.mse()}")
+print(f"R2: {performance_test.r2()}")
+print(f"Gini: {performance_test.gini()}")
+print(f"AIC: {performance_test.aic()}")
+print(f"LogLoss: {performance_test.logloss()}")
+
+performance_test.plot(type='roc')
+
+# Coeficientes 
+
+coeficientes = model_glm._model_json['output']['coefficients_table'].as_data_frame()
+
+
+
+
 
 
 
