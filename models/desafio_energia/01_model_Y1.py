@@ -11,27 +11,14 @@ import pandas as pd
 import csv
 import numpy as np
 import math as my
-import scipy
-from datetime import date
-from datetime import datetime, timedelta
-import itertools
 import matplotlib.pyplot as plt
-from dateutil import rrule, parser
 import random
 import math
-import pandas as pd
-import numpy as np
-import math as mt
-import datetime as dt
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
-from sklearn.model_selection import train_test_split
-from sklearn import preprocessing
-from sklearn import datasets
 from IPython.display import Image
-from sklearn import metrics
 from scipy import stats
 from sklearn.feature_selection import VarianceThreshold
+import h2o
+from h2o.estimators.glm import H2OGeneralizedLinearEstimator
 %matplotlib inline
 
 # Leer funciones
@@ -42,6 +29,9 @@ from functions.leer_csv import *
 from functions.impute import *
 from functions.delete_constant_variables import *
 from functions.df_train_test import *
+from functions.Grafica_CROC import *
+from functions.Grafica_KS_PR import *
+from functions.fit_metrics import *
 
 # parametros
 
@@ -83,11 +73,9 @@ df_train=delete_constants_variables(df_train,5,'target')
 predictors=df_train.drop(['target'], axis=1).columns.tolist()
 
 # importar h2o 
-import h2o
-from h2o.estimators.glm import H2OGeneralizedLinearEstimator
 
 # Bases tran y test 
-h2o.init(ip = "localhost",nthreads = -1,max_mem_size = "6g")
+h2o.init(ip = "localhost",nthreads = -1,max_mem_size = "3g")
 train = h2o.H2OFrame(df_train)
 train['target'] = train['target'].asfactor()
 
@@ -129,7 +117,7 @@ variables=variables['variable'].tolist()
 
 # Modelo Real
 
-model_glm = H2OGeneralizedLinearEstimator(family = 'binomial',link   = "logit", model_id = 'reg_log')
+model_glm = H2OGeneralizedLinearEstimator(family = 'binomial',link = "logit", model_id = 'reg_log')
 model_glm.train(x = variables, y = 'target', training_frame = train, validation_frame=test)
 
 #importancia predictores
@@ -146,6 +134,8 @@ fig.suptitle('Importancia de los predictores (Top 10)', fontsize='large');
 # Metricas performance ----------------------------------------------------
 # -------------------------------------------------------------------------
 
+# Metricas h2o
+
 performance_test = model_glm.model_performance(test_data = test)
 
 print(f"auc: {performance_test.auc()}")
@@ -161,8 +151,19 @@ performance_test.plot(type='roc')
 
 coeficientes = model_glm._model_json['output']['coefficients_table'].as_data_frame()
 
+# Otras metricas de perfomance
 
+predicciones = model_glm.predict(test).as_data_frame()
+df_test=test.as_data_frame()
 
+# Grafica CROC
+Grafica_CROC(df_test['target'],df_test['pred'],0.5,[10,5])
+
+# Grafica Presicion Recall
+Grafica_KS_PR(df_test['target'],df_test['pred'])
+
+# Interpretacion de metricas
+fit_metrics(df_test['target'],0.5,df_test['pred'],'si')
 
 
 
